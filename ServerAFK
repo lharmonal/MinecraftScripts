@@ -1,0 +1,152 @@
+import time
+import random
+import pygetwindow as gw
+import win32gui
+import win32con
+import win32api
+import pyautogui
+import psutil
+from datetime import datetime
+from pywinauto.application import Application
+
+
+"""Getting Minecraft window and returning handle"""
+def get_minecraft_window():
+    windows = gw.getWindowsWithTitle("Minecraft")
+    return windows[0]._hWnd if windows else None
+
+"""Bring Minecraft to the foreground"""
+def focus_minecraft():
+    hwnd = get_minecraft_window()
+    if hwnd:
+        win32gui.ShowWindow(hwnd, 5)  # Restore window if minimized
+        win32gui.SetForegroundWindow(hwnd)  # Bring to front
+        print("🟢 Minecraft window activated.")
+        time.sleep(1)  # Allow window to fully activate
+
+"""Send real key presses using pyautogui (for reconnecting)"""
+def send_real_key(key):
+    pyautogui.press(key)
+    print(f"Sent {key} (real input)")
+
+"""Send background key presses using win32api (for in-game movements)"""
+def send_background_key(key):
+    key_mapping = {
+        "W": 0x57,
+        "A": 0x41,
+        "S": 0x53,
+        "D": 0x44,
+        "SPACE": 0x20
+    }
+    key_code = key_mapping.get(key.upper())
+
+    if key_code:
+        win32api.keybd_event(key_code, 0, 0, 0)  # Key down
+        time.sleep(0.1)
+        win32api.keybd_event(key_code, 0, win32con.KEYEVENTF_KEYUP, 0)  # Key up
+        print(f"Sent {key} (background movement)")
+
+"""Check if Minecraft is still connected to the server"""
+def is_connected(server_addr):
+    for conn in psutil.net_connections(kind="inet"):
+        if conn.status == "ESTABLISHED" and conn.raddr == server_addr:
+            return True
+    return False
+
+"""Finds the Minecraft server connection (returns the remote IP:port)"""
+def get_minecraft_server_connection():
+    for conn in psutil.net_connections(kind="inet"):
+        if conn.status == "ESTABLISHED" and conn.raddr and conn.raddr.port == 25565:
+            return conn.raddr
+    return None
+
+"""Reconnect to the Minecraft server (Uses system-wide inputs for menu navigation)"""
+def reconnect_to_server():
+    print("🔄 Attempting to reconnect...")
+    focus_minecraft()
+
+    time.sleep(1)  # Wait for focus
+
+    # Step 1: Escape out of any open menus
+    for _ in range(3):
+        send_real_key("esc")
+        time.sleep(0.5)
+
+    # Step 2: Navigate to the server listds
+    send_real_key("tab")
+    time.sleep(0.5)
+    send_real_key("tab")
+    time.sleep(0.5)
+    send_real_key("enter")  # Open server list
+
+
+    send_real_key("tab") # nav to direct connection
+    time.sleep(0.5)
+    send_real_key("tab") #Select direct connection
+    time.sleep(0.5)
+    send_real_key("enter") # Connects to ip "preloaded to penguin.gg"
+    time.sleep(0.5)
+    send_real_key("enter") # Connects to ip "preloaded to penguin.gg"
+
+    time.sleep(10)  # Wait for server to load
+    print("hello")
+    # Step 3: Open chat and send "/server skyblock"
+    send_real_key("t")  # Open chat
+    time.sleep(0.5)
+
+    command = "/server skyblock"
+    pyautogui.write(command, interval=0.1)  # Type the command
+    send_real_key("enter")  # Send the command
+
+    print("✅ Reconnected to Skyblock!")
+    time.sleep(5)  # Wait for full load-in
+
+"""Main movement loop (Uses background inputs)"""
+def main_movement_loop():
+    hwnd = get_minecraft_window()
+    now = datetime.now()
+
+    if not hwnd:
+        print("Minecraft window not found!")
+        return
+
+    server_addr = get_minecraft_server_connection()
+    if not server_addr:
+        print("⚠️ No active Minecraft server connection found. Start the game first!")
+        return
+
+    keys = ["A", "D", "SPACE"]
+
+    while True:
+        if not is_connected(server_addr):
+            timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+            print(f"🚨 Disconnected at {timestamp}. Attempting to reconnect...")
+            reconnect_to_server()
+            server_addr = get_minecraft_server_connection()
+            
+            if not server_addr:
+                print("❌ Failed to reconnect. Exiting script.")
+                break
+            else:
+                print("✅ Successfully reconnected!")
+                continue  # Restart AFK loop
+        
+        key = random.choice(keys)
+        send_background_key(key)  # Send background movements
+        send_background_key("S")
+        time.sleep(5)
+
+"""Send home command every 15 minutes NOT BEING USED RIGHT NOW"""
+def send_home_command():
+    print("Sending home command '/home fish'")
+    send_real_key("t")  # Open chat
+    time.sleep(0.5)
+    pyautogui.write("/home fish", interval=0.1)  # Type the command
+    send_real_key("enter")  # Send the command
+    print("✅ Home command sent")
+    time.sleep(2)
+
+if __name__ == "__main__":
+    print("Running Hybrid AFK script for Minecraft (background mode)...")
+    time.sleep(5)
+    main_movement_loop()  # Start the main loop
