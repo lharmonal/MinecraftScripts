@@ -1,0 +1,2 @@
+
+    hwnd = get_minecraft_window()
